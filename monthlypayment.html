@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Loan Repayment Calculator</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 700px;
+            background-color: #ffffff;
+            padding: 25px 40px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #005a9c;
+        }
+        h2 {
+            border-top: 1px solid #e0e0e0;
+            padding-top: 25px;
+            margin-top: 30px;
+        }
+        .calculator-section {
+            margin-bottom: 30px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1.1em;
+            box-sizing: border-box; /* Important for padding and width */
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background-color: #007bff;
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 1.2em;
+            font-weight: 500;
+            text-align: center;
+            display: none; /* Hidden by default */
+        }
+        .result.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .result.info {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+        }
+        .result.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .small-text {
+            font-size: 0.9em;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 10px;
+        }
+        #recalculator {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        #recalculator.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>My Loan Repayment Calculator</h1>
+
+    <!-- Calculator 1: Calculate Remaining Period -->
+    <div class="calculator-section" id="period-calculator">
+        <h2>Part 1: How Long Do I Still Need to Pay?</h2>
+        <form id="periodForm">
+            <label for="balance">Current Loan Principal Balance (RM)</label>
+            <input type="number" id="balance" placeholder="e.g., 350000" step="100">
+
+            <label for="monthlyPayment">My Current Monthly Payment (RM)</label>
+            <input type="number" id="monthlyPayment" placeholder="e.g., 1800" step="10">
+
+            <label for="currentRate">My Current Annual Interest Rate (%)</label>
+            <input type="number" id="currentRate" placeholder="e.g., 4.25" step="0.01">
+
+            <button type="button" onclick="calculatePeriod()">Calculate Remaining Period</button>
+        </form>
+        <div id="periodResult" class="result"></div>
+    </div>
+
+    <!-- Calculator 2: Recalculate New Payment -->
+    <div class="calculator-section" id="recalculator">
+        <h2>Part 2: What Is My New Payment After an Interest Rate Change?</h2>
+        <p class="small-text">First, complete Part 1. The details will be automatically filled below.</p>
+        <form id="newPaymentForm">
+            <label for="rateChange">Interest Rate Change (%)</label>
+            <input type="number" id="rateChange" placeholder="e.g., +0.25 or -0.25" step="0.01">
+            
+            <!-- Hidden fields to carry over data -->
+            <input type="hidden" id="newCalcBalance">
+            <input type="hidden" id="newCalcMonths">
+            <input type="hidden" id="originalRate">
+
+            <button type="button" onclick="recalculatePayment()">Calculate New Monthly Payment</button>
+        </form>
+        <div id="newPaymentResult" class="result"></div>
+        <p class="small-text">Disclaimer: This calculator provides an estimate for informational purposes only and may not reflect the exact figures from your bank.</p>
+    </div>
+
+</div>
+
+<script>
+    // --- PART 1: CALCULATE REMAINING LOAN PERIOD ---
+    function calculatePeriod() {
+        const balance = parseFloat(document.getElementById('balance').value);
+        const monthlyPayment = parseFloat(document.getElementById('monthlyPayment').value);
+        const annualRate = parseFloat(document.getElementById('currentRate').value);
+        const periodResultDiv = document.getElementById('periodResult');
+
+        // Input validation
+        if (isNaN(balance) || isNaN(monthlyPayment) || isNaN(annualRate) || balance <= 0 || monthlyPayment <= 0 || annualRate <= 0) {
+            periodResultDiv.innerHTML = 'Please fill in all fields with positive numbers.';
+            periodResultDiv.className = 'result error';
+            periodResultDiv.style.display = 'block';
+            return;
+        }
+
+        const monthlyRate = (annualRate / 100) / 12;
+
+        // Check if payment covers interest
+        if (monthlyPayment <= balance * monthlyRate) {
+            periodResultDiv.innerHTML = 'Error: Your monthly payment is too low to cover the interest. The loan will never be paid off.';
+            periodResultDiv.className = 'result error';
+            periodResultDiv.style.display = 'block';
+            return;
+        }
+
+        // Amortisation formula to find n (number of payments)
+        // n = -log(1 - (P * i) / M) / log(1 + i)
+        const n = -Math.log(1 - (balance * monthlyRate) / monthlyPayment) / Math.log(1 + monthlyRate);
+        
+        const totalMonths = Math.ceil(n);
+        const years = Math.floor(totalMonths / 12);
+        const months = totalMonths % 12;
+
+        periodResultDiv.innerHTML = `You have approximately <strong>${years} years and ${months} months</strong> left to pay.`;
+        periodResultDiv.className = 'result success';
+        periodResultDiv.style.display = 'block';
+        
+        // --- Activate and populate the second calculator ---
+        document.getElementById('recalculator').classList.add('active');
+        document.getElementById('newCalcBalance').value = balance;
+        document.getElementById('newCalcMonths').value = totalMonths;
+        document.getElementById('originalRate').value = annualRate;
+    }
+
+    // --- PART 2: RECALCULATE NEW MONTHLY PAYMENT ---
+    function recalculatePayment() {
+        const balance = parseFloat(document.getElementById('newCalcBalance').value);
+        const totalMonths = parseInt(document.getElementById('newCalcMonths').value);
+        const originalRate = parseFloat(document.getElementById('originalRate').value);
+        const rateChange = parseFloat(document.getElementById('rateChange').value);
+        const newPaymentResultDiv = document.getElementById('newPaymentResult');
+
+        // Input validation
+        if (isNaN(rateChange)) {
+            newPaymentResultDiv.innerHTML = 'Please enter the interest rate change.';
+            newPaymentResultDiv.className = 'result error';
+            newPaymentResultDiv.style.display = 'block';
+            return;
+        }
+
+        const newAnnualRate = originalRate + rateChange;
+        const newMonthlyRate = (newAnnualRate / 100) / 12;
+
+        if (newMonthlyRate <= 0) {
+            newPaymentResultDiv.innerHTML = 'The new interest rate must be positive.';
+            newPaymentResultDiv.className = 'result error';
+            newPaymentResultDiv.style.display = 'block';
+            return;
+        }
+        
+        // Standard amortisation formula to find M (monthly payment)
+        // M = P [ i(1 + i)^n ] / [ (1 + i)^n – 1 ]
+        const factor = Math.pow(1 + newMonthlyRate, totalMonths);
+        const newMonthlyPayment = balance * (newMonthlyRate * factor) / (factor - 1);
+
+        const formattedPayment = newMonthlyPayment.toFixed(2);
+        const formattedNewRate = newAnnualRate.toFixed(3);
+
+        newPaymentResultDiv.innerHTML = `Based on a new interest rate of <strong>${formattedNewRate}%</strong>, your new estimated monthly payment will be: <br><strong>RM ${formattedPayment}</strong>`;
+        newPaymentResultDiv.className = 'result info';
+        newPaymentResultDiv.style.display = 'block';
+    }
+
+</script>
+
+</body>
+</html>
